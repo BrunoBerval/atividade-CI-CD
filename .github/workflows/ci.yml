@@ -18,7 +18,7 @@ jobs:
   # BACKEND: testes (pytest) + smoke test com o servidor real
   # ------------------------------------------------------------------
   backend:
-    name: Backend (pytest)
+    name: Backend (formatação, testes)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -34,6 +34,9 @@ jobs:
 
       - name: Instalar dependências
         run: pip install -r requirements.txt
+
+      - name: Verificar formatação (Ruff)
+        run: ruff format --check --diff .
 
       - name: Rodar testes
         run: python -m pytest -v
@@ -63,7 +66,7 @@ jobs:
   # FRONTEND: lint + testes de integração + build
   # ------------------------------------------------------------------
   frontend:
-    name: Frontend (lint, testes, build)
+    name: Frontend (formatação, lint, testes, build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -79,6 +82,9 @@ jobs:
 
       - name: Instalar dependências
         run: npm ci
+
+      - name: Verificar formatação (Prettier)
+        run: npm run format:check
 
       - name: Lint
         run: npm run lint
