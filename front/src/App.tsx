@@ -228,6 +228,7 @@ export default function App() {
     <main className="container">
       <style>{css}</style>
       <h1>Nomes e Idades</h1>
+      <h3>CRUD completo</h3>
 
       <div className="grid">
         <CrudSection<NameItem>
