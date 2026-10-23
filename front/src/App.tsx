@@ -54,7 +54,11 @@ const formatDate =(iso: string) => {
   return `${d}/${m}/${y}`;
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Data local (YYYY-MM-DD). toISOString() usaria UTC e, à noite no Brasil, já devolveria "amanhã".
+const toLocalISODate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+const today = () => toLocalISODate(new Date());
 
 // ---------- Seção genérica de CRUD ----------
 interface CrudSectionProps<T extends { id: number }> {
@@ -150,12 +154,13 @@ function CrudSection<T extends { id: number }>({
   const dateProps = inputType === "date" ? { max: today() } : {};
 
   return (
-    <section className="card">
+    <section className="card" aria-label={title}>
       <h2>{title}</h2>
 
       <form className="row" onSubmit={handleCreate}>
         <input
           type={inputType}
+          aria-label="Novo valor"
           value={newValue}
           placeholder={placeholder}
           onChange={(e) => setNewValue(e.target.value)}
@@ -185,6 +190,7 @@ function CrudSection<T extends { id: number }>({
                 <>
                   <input
                     type={inputType}
+                    aria-label="Editar valor"
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
                     autoFocus

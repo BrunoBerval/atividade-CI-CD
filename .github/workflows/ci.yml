@@ -1,0 +1,122 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancela execuções antigas da mesma branch quando chega um commit novo
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ------------------------------------------------------------------
+  # BACKEND: testes (pytest) + smoke test com o servidor real
+  # ------------------------------------------------------------------
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: back # <- pasta do backend (main.py, tests/, requirements.txt)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: back/requirements.txt
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Rodar testes
+        run: python -m pytest -v
+
+      - name: Smoke test (sobe o servidor de verdade e chama a API)
+        env:
+          DATABASE_URL: sqlite:///./smoke.db
+        run: |
+          uvicorn main:app --port 8000 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID' EXIT
+
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:8000/openapi.json >/dev/null && break
+            sleep 0.5
+          done
+
+          curl -sf -X POST http://localhost:8000/names \
+            -H 'Content-Type: application/json' -d '{"name":"CI"}'
+          echo
+          curl -sf -X POST http://localhost:8000/ages \
+            -H 'Content-Type: application/json' -d '{"birth_date":"2000-01-01"}'
+          echo
+          curl -sf http://localhost:8000/names | grep -q '"CI"'
+
+  # ------------------------------------------------------------------
+  # FRONTEND: lint + testes de integração + build
+  # ------------------------------------------------------------------
+  frontend:
+    name: Frontend (lint, testes, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: front # <- pasta do frontend (package.json, src/)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Testes de integração
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Guardar build para o deploy
+        uses: actions/upload-artifact@v4
+        with:
+          name: front-dist
+          path: front/dist
+          retention-days: 7
+
+  # ------------------------------------------------------------------
+  # CD: só roda em push na main, depois que backend e frontend passaram
+  # ------------------------------------------------------------------
+  deploy:
+    name: Deploy
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: front-dist
+          path: dist
+
+      # TODO: troque este passo pelo seu destino real. Exemplos:
+      #   - Vercel/Netlify:  usar a CLI ou a action oficial do serviço
+      #   - Servidor próprio: rsync/scp de ./dist para o host
+      #   - Backend: build de imagem Docker + push para o registry e deploy
+      # Guarde tokens/chaves em Settings > Secrets and variables > Actions.
+      - name: Deploy (placeholder)
+        run: |
+          echo "Build do front pronto para publicar:"
+          ls -la dist
